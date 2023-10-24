@@ -8,6 +8,7 @@ from rlbench.action_modes.arm_action_modes import JointVelocity
 from rlbench.action_modes.gripper_action_modes import Discrete
 from rlbench.backend.utils import task_file_to_task_class
 from rlbench.environment import Environment
+import json
 import rlbench.backend.task as task
 
 import os
@@ -25,7 +26,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('save_path',
                     '/tmp/rlbench_data/',
                     'Where to save the demos.')
-flags.DEFINE_list('tasks', [],
+flags.DEFINE_list('tasks', ["open_drawer"],
                   'The tasks to collect. If empty, all tasks are collected.')
 flags.DEFINE_list('image_size', [128, 128],
                   'The size of the images tp save.')
@@ -74,6 +75,20 @@ def save_demo(demo, example_path, variation):
     front_rgb_path = os.path.join(example_path, FRONT_RGB_FOLDER)
     front_depth_path = os.path.join(example_path, FRONT_DEPTH_FOLDER)
     front_mask_path = os.path.join(example_path, FRONT_MASK_FOLDER)
+    '''
+    Octi Edit Begins
+    '''
+    colliding_object_list_path = os.path.join(example_path, COLLIDING_OBJECT_LIST_FOLDER)
+    grasped_object_list_path = os.path.join(example_path, GRASPED_OBJECT_LIST_FOLDER)
+    left_shoulder_mask_handle_path = os.path.join(example_path, LEFT_SHOULDER_MASK_HANDLE_FOLDER)
+    right_shoulder_mask_handle_path = os.path.join(example_path, RIGHT_SHOULDER_MASK_HANDLE_FOLDER)
+    overhead_mask_handle_path = os.path.join(example_path, OVERHEAD_MASK_HANDLE_FOLDER)
+    wrist_mask_handle_path = os.path.join(example_path, WRIST_MASK_HANDLE_FOLDER)
+    front_mask_handle_path = os.path.join(example_path, FRONT_MASK_HANDLE_FOLDER)
+    handle_to_name_path = example_path
+    '''
+    Octi Edit Ends
+    '''
 
     check_and_make(left_shoulder_rgb_path)
     check_and_make(left_shoulder_depth_path)
@@ -90,31 +105,102 @@ def save_demo(demo, example_path, variation):
     check_and_make(front_rgb_path)
     check_and_make(front_depth_path)
     check_and_make(front_mask_path)
+    '''
+    Octi Edit Begins
+    '''
+    check_and_make(colliding_object_list_path)
+    check_and_make(grasped_object_list_path)
+    check_and_make(left_shoulder_mask_handle_path)
+    check_and_make(right_shoulder_mask_handle_path)
+    check_and_make(overhead_mask_handle_path)
+    check_and_make(wrist_mask_handle_path)
+    check_and_make(front_mask_handle_path)
+    check_and_make(handle_to_name_path)
+    '''
+    Octi Edit Ends
+    '''
+
+    '''
+    Octi Edit Begins
+    '''
+    def depth_to_grayscale(depth_array, scale_factor=1.0):
+        normalized_depth = ((depth_array / np.max(depth_array)) * 255).astype(np.uint8)
+        return Image.fromarray(normalized_depth, 'L')
+    '''
+    Octi Edit Ends
+    '''
 
     for i, obs in enumerate(demo):
         left_shoulder_rgb = Image.fromarray(obs.left_shoulder_rgb)
-        left_shoulder_depth = utils.float_array_to_rgb_image(
-            obs.left_shoulder_depth, scale_factor=DEPTH_SCALE)
+        # left_shoulder_depth = utils.float_array_to_rgb_image(
+        #     obs.left_shoulder_depth, scale_factor=DEPTH_SCALE)
         left_shoulder_mask = Image.fromarray(
             (obs.left_shoulder_mask * 255).astype(np.uint8))
         right_shoulder_rgb = Image.fromarray(obs.right_shoulder_rgb)
-        right_shoulder_depth = utils.float_array_to_rgb_image(
-            obs.right_shoulder_depth, scale_factor=DEPTH_SCALE)
+        # right_shoulder_depth = utils.float_array_to_rgb_image(
+        #     obs.right_shoulder_depth, scale_factor=DEPTH_SCALE)
         right_shoulder_mask = Image.fromarray(
             (obs.right_shoulder_mask * 255).astype(np.uint8))
         overhead_rgb = Image.fromarray(obs.overhead_rgb)
-        overhead_depth = utils.float_array_to_rgb_image(
-            obs.overhead_depth, scale_factor=DEPTH_SCALE)
+        # overhead_depth = utils.float_array_to_rgb_image(
+        #     obs.overhead_depth, scale_factor=DEPTH_SCALE)
         overhead_mask = Image.fromarray(
             (obs.overhead_mask * 255).astype(np.uint8))
         wrist_rgb = Image.fromarray(obs.wrist_rgb)
-        wrist_depth = utils.float_array_to_rgb_image(
-            obs.wrist_depth, scale_factor=DEPTH_SCALE)
+        # wrist_depth = utils.float_array_to_rgb_image(
+        #     obs.wrist_depth, scale_factor=DEPTH_SCALE)
         wrist_mask = Image.fromarray((obs.wrist_mask * 255).astype(np.uint8))
         front_rgb = Image.fromarray(obs.front_rgb)
-        front_depth = utils.float_array_to_rgb_image(
-            obs.front_depth, scale_factor=DEPTH_SCALE)
+        # front_depth = utils.float_array_to_rgb_image(
+        #     obs.front_depth, scale_factor=DEPTH_SCALE)
         front_mask = Image.fromarray((obs.front_mask * 255).astype(np.uint8))
+
+
+        left_shoulder_depth = depth_to_grayscale(obs.left_shoulder_depth, DEPTH_SCALE)
+        right_shoulder_depth = depth_to_grayscale(obs.right_shoulder_depth, DEPTH_SCALE)
+        overhead_depth = depth_to_grayscale(obs.overhead_depth, DEPTH_SCALE)
+        wrist_depth = depth_to_grayscale(obs.wrist_depth, DEPTH_SCALE)
+        front_depth = depth_to_grayscale(obs.front_depth, DEPTH_SCALE)
+        '''
+        Octi Edit Begins
+        '''
+        #save the colliding object list
+        colliding_object_list = obs.colliding_object_list
+        #save the grasped object list
+        grasped_object_list = obs.grasped_object_list
+        #saving the colliding object list as json
+        left_shoulder_mask_handle = obs.left_shoulder_mask_handle
+        right_shoulder_mask_handle = obs.right_shoulder_mask_handle
+        overhead_mask_handle = obs.overhead_mask_handle
+        wrist_mask_handle = obs.wrist_mask_handle
+        front_mask_handle = obs.front_mask_handle
+        handle_to_name = obs.handle_to_name
+        with open(os.path.join(colliding_object_list_path, 'colliding_object_list_%d.json' % i), 'w') as f:
+            json.dump(colliding_object_list, f)
+        #saving the grasped object list as json
+        with open(os.path.join(grasped_object_list_path, 'grasped_object_list_%d.json' % i), 'w') as f:
+            json.dump(grasped_object_list, f)
+
+        with open(os.path.join(left_shoulder_mask_handle_path, 'left_shoulder_mask_handle_%d.json' % i), 'w') as f:
+            json.dump(left_shoulder_mask_handle.tolist(), f)
+        with open(os.path.join(right_shoulder_mask_handle_path, 'right_shoulder_mask_handle_%d.json' % i), 'w') as f:
+            json.dump(right_shoulder_mask_handle.tolist(), f)
+        with open(os.path.join(overhead_mask_handle_path, 'overhead_mask_handle_%d.json' % i), 'w') as f:
+            json.dump(overhead_mask_handle.tolist(), f)
+        with open(os.path.join(wrist_mask_handle_path, 'wrist_mask_handle_%d.json' % i), 'w') as f:
+            json.dump(wrist_mask_handle.tolist(), f)
+        with open(os.path.join(front_mask_handle_path, 'front_mask_handle_%d.json' % i), 'w') as f:
+            json.dump(front_mask_handle.tolist(), f)
+
+
+        filename = os.path.join(handle_to_name_path, f'handle_to_name.json')
+        # Check if the file already exists
+        if not os.path.exists(filename):
+            with open(filename, 'w') as f:
+                json.dump(handle_to_name, f)
+        '''
+        Octi Edit Ends
+        '''
 
         left_shoulder_rgb.save(
             os.path.join(left_shoulder_rgb_path, IMAGE_FORMAT % i))
@@ -162,6 +248,19 @@ def save_demo(demo, example_path, variation):
         obs.front_depth = None
         obs.front_point_cloud = None
         obs.front_mask = None
+        '''
+        Octi Edit Begins
+        '''
+        obs.colliding_object_list = None  # if you choose to set it to None
+        obs.grasped_object_list = None
+        obs.left_shoulder_mask_handle = None
+        obs.right_shoulder_mask_handle = None
+        obs.overhead_mask_handle = None
+        obs.wrist_mask_handle = None
+        obs.front_mask_handle = None
+        '''
+        Octi Edit Ends
+        '''
 
     # Save the low-dimension data
     with open(os.path.join(example_path, LOW_DIM_PICKLE), 'wb') as f:
@@ -190,11 +289,11 @@ def run(i, lock, task_index, variation_count, results, file_lock, tasks):
     obs_config.front_camera.image_size = img_size
 
     # Store depth as 0 - 1
-    obs_config.right_shoulder_camera.depth_in_meters = False
-    obs_config.left_shoulder_camera.depth_in_meters = False
-    obs_config.overhead_camera.depth_in_meters = False
-    obs_config.wrist_camera.depth_in_meters = False
-    obs_config.front_camera.depth_in_meters = False
+    obs_config.right_shoulder_camera.depth_in_meters = True
+    obs_config.left_shoulder_camera.depth_in_meters = True
+    obs_config.overhead_camera.depth_in_meters = True
+    obs_config.wrist_camera.depth_in_meters = True
+    obs_config.front_camera.depth_in_meters = True
 
     # We want to save the masks as rgb encodings.
     obs_config.left_shoulder_camera.masks_as_one_channel = False
@@ -263,6 +362,7 @@ def run(i, lock, task_index, variation_count, results, file_lock, tasks):
                 try:
                     task_env = rlbench_env.get_task(t)
                     task_env.set_variation(my_variation_count)
+                    #here will call the scene init
                     descriptions, obs = task_env.reset()
 
                     # TODO: for now we do the explicit looping.

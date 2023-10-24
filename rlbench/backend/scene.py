@@ -6,6 +6,14 @@ from pyrep.const import ObjectType
 from pyrep.errors import ConfigurationPathError
 from pyrep.objects import Dummy
 from pyrep.objects.shape import Shape
+'''
+Octi Edit Begins
+'''
+from pyrep.backend import sim
+import colorsys
+'''
+Octi Edit Ends
+'''
 from pyrep.objects.vision_sensor import VisionSensor
 
 from rlbench.backend.exceptions import (
@@ -80,6 +88,16 @@ class Scene(object):
         self._robot_shapes = self.robot.arm.get_objects_in_tree(
             object_type=ObjectType.SHAPE)
 
+        '''
+        Octi Edit Begin
+        '''
+        self._handle_to_name = None
+        self._handle_to_color = None
+        # self._handle_to_name = {s._handle: sim.simGetObjectName(s._handle) for s in self.pyrep.get_objects_in_tree(object_type=ObjectType.ALL)}
+        # self._handle_to_color = self.get_handle_to_color_map()
+        '''
+        Octi Edit Ends
+        '''
     def load(self, task: Task) -> None:
         """Loads the task and positions at the centre of the workspace.
 
@@ -145,6 +163,8 @@ class Scene(object):
         # Let objects come to rest
         [self.pyrep.step() for _ in range(STEPS_BEFORE_EPISODE_START)]
         self._has_init_episode = True
+        self._handle_to_name = {s._handle: sim.simGetObjectName(s._handle) for s in self.pyrep.get_objects_in_tree(object_type=ObjectType.ALL)}
+        self._handle_to_color = self.get_handle_to_color_map()
         return descriptions
 
     def reset(self) -> None:
@@ -166,6 +186,20 @@ class Scene(object):
             self.task.cleanup_()
             self.task.restore_state(self._initial_task_state)
         self.task.set_initial_objects_in_scene()
+
+    def get_handle_to_color_map(self):
+            handles = [s._handle for s in self.pyrep.get_objects_in_tree(object_type=ObjectType.ALL)]
+            min_handle = min(handles)
+            max_handle = max(handles)
+            normalized_handles = [(h - min_handle) / (max_handle - min_handle) for h in handles]
+
+            handle_to_color = {}
+            for norm_handle, handle in zip(normalized_handles, handles):
+                # Here we're only varying the Hue. Saturation and Value are kept at 1.0.
+                # You can change this as needed.
+                r, g, b = colorsys.hsv_to_rgb(norm_handle, 1.0, 1.0)
+                handle_to_color[handle] = np.array([int(r * 255), int(g * 255), int(b * 255)], dtype=np.uint8)
+            return handle_to_color
 
     def get_observation(self) -> Observation:
         tip = self.robot.arm.get_tip()
@@ -243,7 +277,6 @@ class Scene(object):
         front_rgb, front_depth, front_pcd = get_rgb_depth(
             self._cam_front, fc_ob.rgb, fc_ob.depth, fc_ob.point_cloud,
             fc_ob.rgb_noise, fc_ob.depth_noise, fc_ob.depth_in_meters)
-
         left_shoulder_mask = get_mask(self._cam_over_shoulder_left_mask,
                                       lsc_mask_fn) if lsc_ob.mask else None
         right_shoulder_mask = get_mask(self._cam_over_shoulder_right_mask,
@@ -254,6 +287,59 @@ class Scene(object):
                               wc_mask_fn) if wc_ob.mask else None
         front_mask = get_mask(self._cam_front_mask,
                               fc_mask_fn) if fc_ob.mask else None
+        '''
+        Octi Edit Begins
+        '''
+        def map_handle_to_color(handle):
+            return self._handle_to_color.get(handle, np.array([0, 0, 0], dtype=np.uint8))
+
+        def get_handles_for_masks(masks):
+            return [np.round(mask[:,:,0] * 255).astype(np.int) for mask in masks]
+
+        def apply_vectorized_map(vectorized_map, handles):
+            object_array = vectorized_map(handles)
+            return np.array(object_array.tolist(), dtype=np.uint8)
+
+        vectorized_map = np.vectorize(map_handle_to_color, otypes=[np.ndarray])
+
+        masks = [left_shoulder_mask, right_shoulder_mask, overhead_mask, wrist_mask, front_mask]
+        handles_for_masks = get_handles_for_masks(masks)
+        left_shoulder_mask_handle = handles_for_masks[0]
+        right_shoulder_mask_handle = handles_for_masks[1]
+        overhead_mask_handle = handles_for_masks[2]
+        wrist_mask_handle = handles_for_masks[3]
+        front_mask_handle = handles_for_masks[4]
+        new_masks = [apply_vectorized_map(vectorized_map, handle) for handle in handles_for_masks]
+        left_shoulder_mask, right_shoulder_mask, overhead_mask, wrist_mask, front_mask = new_masks
+
+        left_finger_contact_handle = sim.simGetObjectHandle("Panda_rightfinger_force_contact")
+        right_finger_contact_handle = sim.simGetObjectHandle("Panda_leftfinger_force_contact")
+
+        tree_objects = self.pyrep.get_objects_in_tree(object_type=ObjectType.SHAPE)
+
+        grasped_object_list_handle = [s._handle for
+                                        s in tree_objects
+                                        if s in self.robot.gripper.get_grasped_objects() or
+                                        (sim.simCheckCollision(s._handle, left_finger_contact_handle)
+                                        and sim.simCheckCollision(s._handle, right_finger_contact_handle)
+                                        and sim.simGetObjectName(s._handle) != 'workspace'
+                                        and sim.simGetObjectName(s._handle) != 'spawn_boundary')]
+        #we should also add all children of grasped object into grasped_list
+        for root in grasped_object_list_handle:
+            for s in self.pyrep.get_objects_in_tree(root):
+                grasped_object_list_handle.append(s._handle)
+
+        grasped_object_list = [ sim.simGetObjectName(handle) for handle in grasped_object_list_handle]
+
+        colliding_object_list = [sim.simGetObjectName(s._handle) for s in tree_objects
+                                  if s not in self._robot_shapes
+                                         and s.is_collidable()
+                                         and self.robot.arm.check_arm_collision(s) and
+                                         s not in self.robot.gripper.get_grasped_objects() and
+                                         sim.simGetObjectName(s._handle) not in grasped_object_list]
+        '''
+        Octi Edit Ends
+        '''
 
         obs = Observation(
             left_shoulder_rgb=left_shoulder_rgb,
@@ -307,6 +393,16 @@ class Scene(object):
             ignore_collisions=(
                 np.array((1.0 if self._ignore_collisions_for_current_waypoint else 0.0))
                 if self._obs_config.record_ignore_collisions else None),
+            #Octi Edit Begins
+            colliding_object_list = colliding_object_list,
+            grasped_object_list = grasped_object_list,
+            left_shoulder_mask_handle = left_shoulder_mask_handle,
+            right_shoulder_mask_handle = right_shoulder_mask_handle,
+            overhead_mask_handle = overhead_mask_handle,
+            wrist_mask_handle = wrist_mask_handle,
+            front_mask_handle = front_mask_handle,
+            handle_to_name = self._handle_to_name,
+            #Octi Edit Ends
             misc=self._get_misc())
         obs = self.task.decorate_observation(obs)
         return obs

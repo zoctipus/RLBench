@@ -36,6 +36,16 @@ class Observation(object):
                  gripper_touch_forces: np.ndarray,
                  task_low_dim_state: np.ndarray,
                  ignore_collisions: np.ndarray,
+                # Octi Edit Begins
+                 colliding_object_list: np.ndarray,
+                 grasped_object_list: np.ndarray,
+                 left_shoulder_mask_handle: np.ndarray,
+                 right_shoulder_mask_handle: np.ndarray,
+                 overhead_mask_handle: np.ndarray,
+                 wrist_mask_handle: np.ndarray,
+                 front_mask_handle: np.ndarray,
+                 handle_to_name: np.ndarray,
+                 # Octi Edit Ends
                  misc: dict):
         self.left_shoulder_rgb = left_shoulder_rgb
         self.left_shoulder_depth = left_shoulder_depth
@@ -67,6 +77,20 @@ class Observation(object):
         self.gripper_touch_forces = gripper_touch_forces
         self.task_low_dim_state = task_low_dim_state
         self.ignore_collisions = ignore_collisions
+        '''
+        Octi Edit Begins
+        '''
+        self.colliding_object_list = colliding_object_list
+        self.grasped_object_list = grasped_object_list
+        self.left_shoulder_mask_handle = left_shoulder_mask_handle
+        self.right_shoulder_mask_handle = right_shoulder_mask_handle
+        self.overhead_mask_handle = overhead_mask_handle
+        self.wrist_mask_handle = wrist_mask_handle
+        self.front_mask_handle = front_mask_handle
+        self.handle_to_name = handle_to_name
+        '''
+        Octi Edit Ends
+        '''
         self.misc = misc
 
     def get_low_dim_data(self) -> np.ndarray:

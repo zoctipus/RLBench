@@ -14,6 +14,7 @@ from rlbench.backend.scene import Scene
 from rlbench.backend.task import Task
 from rlbench.demo import Demo
 from rlbench.observation_config import ObservationConfig
+import traceback
 
 _DT = 0.05
 _MAX_RESET_ATTEMPTS = 40
@@ -150,7 +151,9 @@ class TaskEnvironment(object):
                     break
                 except Exception as e:
                     attempts -= 1
-                    logging.info('Bad demo. ' + str(e) + ' Attempts left: ' + str(attempts))
+                    tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
+                    tb_str = "".join(tb_str)
+                    logging.info(f'Bad demo. {str(e)}. Attempts left: {str(attempts)}. Traceback: {tb_str}')
             if attempts <= 0:
                 raise RuntimeError(
                     'Could not collect demos. Maybe a problem with the task?')
